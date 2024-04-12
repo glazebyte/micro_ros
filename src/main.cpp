@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <SPI.h>
+#include <Adafruit_PWMServoDriver.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -10,12 +12,14 @@
 #include <rclc/executor.h>
 
 #include "motor.h"
+// #include "custom_msg.h"
 
 // msg type
 #include <geometry_msgs/msg/twist.h>
 
 #define RCCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Aborting.\n", __LINE__, (int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Continuing.\n", __LINE__, (int)temp_rc);} }
+
 
 // define ros2 executor and support structure
 rclc_executor_t executor;
@@ -28,22 +32,21 @@ rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_subscription_t susbcriber;
 
-// define subscribe message type
-geometry_msgs__msg__Twist cmd_vel;
+// define motor device
+motor myMotor;
 
-void print_hello(void *pvParameter)
-{
-    Serial.println("Hello World");
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-}
 
-void twist_callback(const void *cmd_vel)
+void wheel_vel_callback(const void *msg_in)
 {
+    const kinematic_msg_wheels_velocity *wheel_vel = (const kinematic_msg_wheels_velocity*) msg_in; 
+    Serial2.printf("wheels velocity = l_motor : %f, r_motor: %f, b_motor: %f \n",wheel_vel->l_wheel,wheel_vel->r_wheel,wheel_vel->b_wheel);
+    myMotor.setWheelsSpeed(*wheel_vel);
 }
 
 void kick_callback()
 {
 }
+
 
 void setup()
 {
@@ -51,7 +54,11 @@ void setup()
     // Serial2 for esp32 telemetry
     Serial.begin(115200);
     Serial2.begin(115200);
-    xTaskCreate(&print_hello, "print_hello", 2048, NULL, 1, NULL);
+
+    myMotor.begin();
+
+    // define subscribe message type
+    kinematic_msg_wheels_velocity wheels_vel;
 
     allocator = rcl_get_default_allocator();
 
@@ -70,8 +77,9 @@ void setup()
 
     // init executor
     rclc_executor_init(&executor, &support.context, 1, &allocator);
+    
 
-    rclc_executor_add_subscription(&executor, &susbcriber, &cmd_vel, &twist_callback, ON_NEW_DATA);
+    rclc_executor_add_subscription(&executor, &susbcriber, &wheels_vel, &wheel_vel_callback, ON_NEW_DATA);
 }
 
 void loop()

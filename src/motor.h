@@ -1,17 +1,11 @@
 #include <Adafruit_PWMServoDriver.h>
-// #include <custom_msg.h>
+#include <omniwheels_interfaces/msg/wheels_velocity3.h>
 
 struct motor_pin
 {
     int lpwm_pin,rpwm_pin;
 };
 
-struct kinematic_msg_wheels_velocity
-{
-    float l_wheel;
-    float r_wheel;
-    float b_wheel;
-};
 
 class motor
 {
@@ -23,6 +17,6 @@ private:
     // wheel_velocity wheels_vel;
 public:
     bool begin();
-    void setWheelsSpeed(kinematic_msg_wheels_velocity wheels_vel);
+    void setWheelsSpeed(omniwheels_interfaces__msg__WheelsVelocity3 wheels_vel);
     void setMotorRPM(motor_pin motor,int rpm);
 };

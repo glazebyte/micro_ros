@@ -12,10 +12,10 @@
 #include <rclc/executor.h>
 
 #include "motor.h"
-// #include "custom_msg.h"
 
 // msg type
 #include <geometry_msgs/msg/twist.h>
+#include <omniwheels_interfaces/msg/wheels_velocity3.h>
 
 #define RCCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Aborting.\n", __LINE__, (int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Continuing.\n", __LINE__, (int)temp_rc);} }
@@ -38,7 +38,7 @@ motor myMotor;
 
 void wheel_vel_callback(const void *msg_in)
 {
-    const kinematic_msg_wheels_velocity *wheel_vel = (const kinematic_msg_wheels_velocity*) msg_in; 
+    const omniwheels_interfaces__msg__WheelsVelocity3 *wheel_vel = (const omniwheels_interfaces__msg__WheelsVelocity3*) msg_in; 
     Serial2.printf("wheels velocity = l_motor : %f, r_motor: %f, b_motor: %f \n",wheel_vel->l_wheel,wheel_vel->r_wheel,wheel_vel->b_wheel);
     myMotor.setWheelsSpeed(*wheel_vel);
 }
@@ -58,7 +58,7 @@ void setup()
     myMotor.begin();
 
     // define subscribe message type
-    kinematic_msg_wheels_velocity wheels_vel;
+    omniwheels_interfaces__msg__WheelsVelocity3 wheels_vel;
 
     allocator = rcl_get_default_allocator();
 
@@ -72,7 +72,7 @@ void setup()
     RCCHECK(rclc_subscription_init_default(
         &susbcriber,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        ROSIDL_GET_MSG_TYPE_SUPPORT(omniwheels_interfaces,msg,WheelsVelocity3),
         "cmd_vel"));
 
     // init executor

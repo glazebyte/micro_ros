@@ -10,7 +10,7 @@ bool motor::begin(){
     return true;
 }
 
-void motor::setWheelsSpeed(kinematic_msg_wheels_velocity wheels_vel){
+void motor::setWheelsSpeed(omniwheels_interfaces__msg__WheelsVelocity3 wheels_vel){
     int rpm_lmotor = map(wheels_vel.l_wheel,-80,80,-4096,4096);
     int rpm_rmotor = map(wheels_vel.r_wheel,-80,80,-4096,4096);
     int rpm_bmotor = map(wheels_vel.b_wheel,-80,80,-4096,4096);

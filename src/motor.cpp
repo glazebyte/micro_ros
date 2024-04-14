@@ -11,9 +11,9 @@ bool motor::begin(){
 }
 
 void motor::setWheelsSpeed(omniwheels_interfaces__msg__WheelsVelocity3 wheels_vel){
-    int rpm_lmotor = map(wheels_vel.l_wheel,-80,80,-4096,4096);
-    int rpm_rmotor = map(wheels_vel.r_wheel,-80,80,-4096,4096);
-    int rpm_bmotor = map(wheels_vel.b_wheel,-80,80,-4096,4096);
+    int rpm_lmotor = wheels_vel.l_wheel/80*4096;
+    int rpm_rmotor = wheels_vel.l_wheel/80*4096;
+    int rpm_bmotor = wheels_vel.l_wheel/80*4096;
     Serial2.printf("l_motor pwm_speed = %d\n",rpm_lmotor);
     Serial2.printf("r_motor pwm_speed = %d\n",rpm_rmotor);
     Serial2.printf("b_motor pwm_speed = %d\n",rpm_bmotor);

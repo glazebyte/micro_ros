@@ -1,4 +1,5 @@
 #include "motor.h"
+#include "mat.h"
 
 bool motor::begin(){
     if (motor_dev)
@@ -10,25 +11,35 @@ bool motor::begin(){
     return true;
 }
 
-void motor::setWheelsSpeed(omniwheels_interfaces__msg__WheelsVelocity3 wheels_vel){
-    int rpm_lmotor = wheels_vel.l_wheel/80*4096;
-    int rpm_rmotor = wheels_vel.l_wheel/80*4096;
-    int rpm_bmotor = wheels_vel.l_wheel/80*4096;
-    Serial2.printf("l_motor pwm_speed = %d\n",rpm_lmotor);
-    Serial2.printf("r_motor pwm_speed = %d\n",rpm_rmotor);
-    Serial2.printf("b_motor pwm_speed = %d\n",rpm_bmotor);
-    setMotorRPM(l_motor,rpm_lmotor);
-    setMotorRPM(r_motor,rpm_rmotor);
-    setMotorRPM(b_motor,rpm_bmotor);
+void motor::setWheelsSpeed(geometry_msgs__msg__Twist cmd_vel){
+    double v = cmd_vel.linear.x;
+    double vn = cmd_vel.linear.y;
+    double w = cmd_vel.angular.z; 
+    // center to wheel radius 16 cm = 0.16m
+    // gamma 30 degree or 0.5235987756 rads
+    double L =0.16;
+    float gamma = 0.5235987756;
+    float wheel_1 = ( w * L - vn ); 
+    float wheel_2 = ( w * L) + (v*cos(gamma)+vn*sin(gamma));
+    float wheel_3 = ( w * L) + (-v*cos(gamma)+vn*sin(gamma));
+    Serial2.printf("wheel_1 speed = %f\n",wheel_1);
+    Serial2.printf("wheel_2 speed = %f\n",wheel_2);
+    Serial2.printf("wheel_3 speed = %f\n",wheel_3);
+    setMotorRPM(this->motor_1,wheel_1);
+    setMotorRPM(this->motor_2,wheel_2);
+    setMotorRPM(this->motor_3,wheel_3);
 }
 
-void motor::setMotorRPM(motor_pin motor, int rpm){
+void motor::setMotorRPM(motor_pin motor, float rpm){
+    rpm = rpm * 4096 / 3.46;
+    Serial2.printf("convert rpm to pwm = %f\n",rpm);
     int pwm = abs(rpm);
+    Serial2.printf("pwm power = %d\n",pwm);
     if(rpm<0){
-        motor_dev->setPWM(motor.rpwm_pin,0,4096);
-        motor_dev->setPWM(motor.lpwm_pin,pwm,4096-pwm);
+        motor_dev->setPin(motor.rpwm_pin,0);
+        motor_dev->setPin(motor.lpwm_pin,pwm);
     }else{
-        motor_dev->setPWM(motor.lpwm_pin,0,4096);
-        motor_dev->setPWM(motor.rpwm_pin,pwm,4096-pwm);
+        motor_dev->setPin(motor.lpwm_pin,0);
+        motor_dev->setPin(motor.rpwm_pin,pwm);
     }
 }

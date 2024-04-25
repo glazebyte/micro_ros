@@ -11,13 +11,13 @@
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 
-#include "motor.h"
+#include "controller.h"
 
-// msg type
-// #include <omniwheels_interfaces/msg/wheels_velocity3.h>
 #include <geometry_msgs/msg/twist.h>
 #include <sensor_msgs/msg/imu.h>
 #include <std_srvs/srv/trigger.h>
+
+#include <cmath>
 
 #define RCCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Aborting.\n", __LINE__, (int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn){rcl_ret_t temp_rc = fn;if ((temp_rc != RCL_RET_OK)){Serial2.printf("Failed status on line %d: %d. Continuing.\n", __LINE__, (int)temp_rc);} }
@@ -59,7 +59,7 @@ geometry_msgs__msg__Twist cmd_vel;
 // imu sensor publisher msg
 sensor_msgs__msg__Imu imu;
 
-motor myMotor;
+controller myController;
 
 
 void wheel_vel_callback(const void *msg_in)
@@ -71,13 +71,12 @@ void wheel_vel_callback(const void *msg_in)
         cmd_vel->linear.y,
         cmd_vel->linear.z,
         cmd_vel->angular.z);
-    myMotor.setWheelsSpeed(*cmd_vel);
+   myController.setWheelsSpeed(*cmd_vel);
 }
 
 void imu_timer_callback(rcl_timer_t *timer,int64_t last_call_time){
     if(timer !=NULL){
-        // do some publish logic
-        Serial2.printf("msakmka");
+        
     }
 }
 
@@ -90,7 +89,6 @@ void shoot_callback(const void * request_msg, void * response_msg){
     shoot_response_msg->message.capacity=strlen(msg);
     shoot_response_msg->message.data= (char *) msg;
     shoot_response_msg->message.size=strlen(msg);
-    Serial2.printf("berhasil\n");
 }
 
 bool create_entities(){
@@ -146,51 +144,48 @@ void destroy_entities()
     RCCHECK( rclc_support_fini( &support));
     cmd_vel.linear={.x=0,.y=0};
     cmd_vel.angular.z=0;
-    myMotor.setWheelsSpeed(cmd_vel);
+    myController.setWheelsSpeed(cmd_vel);
 }
 
 
-void setup()
-{
-    // Serial for microros transport
-    // Serial2 for esp32 telemetry
-    Serial.begin(115200);
-    Serial2.begin(115200);
-    set_microros_serial_transports(Serial);
-    delay(2000);
+void setup(){
+  // Serial for microros transport
+  // Serial2 for esp32 telemetry
+  Serial.begin(115200);
+  Serial2.begin(115200);
+  set_microros_serial_transports(Serial);
+  delay(2000);
 
-    myMotor.begin();
-    state = WAITING_AGENT;
+  myController.begin();
+  state = WAITING_AGENT;
 }
 
-void loop()
-{
-    // rclc_executor_spin_some(&executor,RCL_MS_TO_NS(1000));
+void loop(){
     switch (state) {
-    case WAITING_AGENT:
-      EXECUTE_EVERY_N_MS(500, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
-      Serial2.printf("Waiting-agent\n");
-      break;
-    case AGENT_AVAILABLE:
-      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-      Serial2.printf("Agent Avaible start connect\n");
-      if (state == WAITING_AGENT) {
+      case WAITING_AGENT:
+        EXECUTE_EVERY_N_MS(500, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;);
+        Serial2.printf("Waiting-agent\n");
+        break;
+      case AGENT_AVAILABLE:
+        state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+        Serial2.printf("Agent Avaible start connect\n");
+        if (state == WAITING_AGENT) {
+          destroy_entities();
+        };
+        break;
+      case AGENT_CONNECTED:
+        Serial2.printf("agent connected, start spin\n");
+        EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
+        if (state == AGENT_CONNECTED) {
+          rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
+        }
+        break;
+      case AGENT_DISCONNECTED:
+        Serial2.printf("Agent disconnect\n");
         destroy_entities();
-      };
-      break;
-    case AGENT_CONNECTED:
-      Serial2.printf("agent connected, start spin\n");
-      EXECUTE_EVERY_N_MS(200, state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;);
-      if (state == AGENT_CONNECTED) {
-        rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
-      }
-      break;
-    case AGENT_DISCONNECTED:
-      Serial2.printf("Agent disconnect\n");
-      destroy_entities();
-      state = WAITING_AGENT;
-      break;
-    default:
-      break;
+        state = WAITING_AGENT;
+        break;
+      default:
+        break;
   }
 }

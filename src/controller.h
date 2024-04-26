@@ -13,10 +13,6 @@ struct kicker
     int capacity;
 };
 
-
-
-
-
 class controller
 {
 private:

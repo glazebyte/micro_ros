@@ -16,6 +16,7 @@
 #include <geometry_msgs/msg/twist.h>
 #include <sensor_msgs/msg/imu.h>
 #include <std_srvs/srv/trigger.h>
+#include <std_msgs/msg/bool.h>
 
 #include <cmath>
 
@@ -47,6 +48,7 @@ rcl_allocator_t allocator;
 rcl_subscription_t sub_cmd_vel;
 rcl_service_t server_shoot;
 rcl_publisher_t pub_imu;
+rcl_subscription_t sub_charge;
 
 // service server msg
 std_srvs__srv__Trigger_Request shoot_request_msg;
@@ -59,24 +61,32 @@ geometry_msgs__msg__Twist cmd_vel;
 // imu sensor publisher msg
 sensor_msgs__msg__Imu imu;
 
+//  charge subscbriber;
+std_msgs__msg__Bool charge;
+
 controller myController;
 
 
 void wheel_vel_callback(const void *msg_in)
 {
-    const geometry_msgs__msg__Twist *cmd_vel = (const geometry_msgs__msg__Twist*) msg_in;
-    Serial2.printf(
-        "linier velocity :\n x = %f\n y = %f\n z = %f \n angular w = %f\n",
-        cmd_vel->linear.x,
-        cmd_vel->linear.y,
-        cmd_vel->linear.z,
-        cmd_vel->angular.z);
+  const geometry_msgs__msg__Twist *cmd_vel = (const geometry_msgs__msg__Twist*) msg_in;
+  Serial2.printf(
+    "linier velocity :\n x = %f\n y = %f\n z = %f \n angular w = %f\n",
+    cmd_vel->linear.x,
+    cmd_vel->linear.y,
+    cmd_vel->linear.z,
+    cmd_vel->angular.z);
    myController.setWheelsSpeed(*cmd_vel);
+}
+
+void charge_callback(const void *msg_in){
+  const std_msgs__msg__Bool *charge_bool = (const std_msgs__msg__Bool *) msg_in;
+  myController.charge(charge_bool->data);
 }
 
 void imu_timer_callback(rcl_timer_t *timer,int64_t last_call_time){
     if(timer !=NULL){
-        
+        Serial2.printf("callback\n");
     }
 }
 
@@ -84,6 +94,7 @@ void shoot_callback(const void * request_msg, void * response_msg){
     std_srvs__srv__Trigger_Request *shoot_request_msg = (std_srvs__srv__Trigger_Request *) request_msg;
     std_srvs__srv__Trigger_Response *shoot_response_msg = (std_srvs__srv__Trigger_Response *) response_msg;
 
+    myController.kick();
     shoot_response_msg->success = true;
     const char *msg="hello world";
     shoot_response_msg->message.capacity=strlen(msg);
@@ -107,6 +118,13 @@ bool create_entities(){
         ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs,msg,Twist),
         "cmd_vel"));
     
+    // charging subscriber
+    RCCHECK(rclc_subscription_init_default(
+        &sub_charge,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs,msg,Bool),
+        "charging"));
+    
     // imu publisher
     RCCHECK(rclc_publisher_init_default(
         &pub_imu,
@@ -122,10 +140,11 @@ bool create_entities(){
         "ball_shoot"));
 
     // init executor
-    rclc_executor_init(&executor, &support.context, 2, &allocator);
+    rclc_executor_init(&executor, &support.context, 3, &allocator);
     
     // add wheel_velocity subscriber to  node
     rclc_executor_add_subscription(&executor, &sub_cmd_vel, &cmd_vel, &wheel_vel_callback, ON_NEW_DATA);
+    rclc_executor_add_subscription(&executor,&sub_charge,&charge,&charge_callback,ON_NEW_DATA);
     rclc_executor_add_service(&executor, &server_shoot, &shoot_request_msg, &shoot_response_msg, &shoot_callback);
 
     return true;
@@ -138,7 +157,8 @@ void destroy_entities()
 
     RCCHECK( rcl_subscription_fini( &sub_cmd_vel,&node));
     RCCHECK( rcl_service_fini( &server_shoot, &node));
-    RCCHECK(rcl_publisher_fini(&pub_imu,&node))
+    RCCHECK(rcl_subscription_fini(&sub_charge,&node));
+    // RCCHECK(rcl_publisher_fini(&pub_imu,&node))
     RCCHECK( rclc_executor_fini( &executor));
     RCCHECK( rcl_node_fini( &node));
     RCCHECK( rclc_support_fini( &support));
@@ -155,8 +175,9 @@ void setup(){
   Serial2.begin(115200);
   set_microros_serial_transports(Serial);
   delay(2000);
-
   myController.begin();
+
+
   state = WAITING_AGENT;
 }
 

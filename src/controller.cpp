@@ -8,6 +8,10 @@ bool controller::begin(){
     controller_dev->begin();
     controller_dev->setPWMFreq(1600);
 
+    Serial2.printf("solenoid mati\n");
+    controller_dev->setPin(solenoid.charge_pin,4096);
+    controller_dev->setPin(solenoid.kick_pin,4096);
+
     addMotorEncodeer(motor_1);
     addMotorEncodeer(motor_2);
     addMotorEncodeer(motor_3);
@@ -26,7 +30,7 @@ void controller::setWheelsSpeed(geometry_msgs__msg__Twist cmd_vel){
     // center to wheel radius 16 cm = 0.16m
     // gamma 30 degree or 0.5235987756 rads
     double L = 0.16;
-    float gamma = 30 * (180 / M_PI);
+    float gamma = 0.5235987756;
     float wheel_1 = (w * L - vn);
     float wheel_2 = (w * L) + (v * cos(gamma) + vn * sin(gamma));
     float wheel_3 = (w * L) + (-v * cos(gamma) + vn * sin(gamma));
@@ -39,7 +43,7 @@ void controller::setWheelsSpeed(geometry_msgs__msg__Twist cmd_vel){
 }
 
 void controller::setMotorRPM(motor motor_dev, float rpm){
-    rpm = rpm * 4096 / 3.46;
+    rpm = rpm * 4096/2;
     Serial2.printf("convert rpm to pwm = %f\n", rpm);
     int pwm = abs(rpm);
     Serial2.printf("pwm power = %d\n", pwm);
